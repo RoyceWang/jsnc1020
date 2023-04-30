@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<title>NC1020 Simulator</title>
+<script type="text/javascript" src="./data/NC1020.js"></script>
+<style type="text/css">
+body{font-family:'新宋体';margin-left:auto;margin-right:auto;padding:20px;width:398px;}
+.controls>div{margin:0 0 5px 0;}
+.controls>div:last-child{margin-bottom:0;}
+.controls>div>button,.controls>div>select{margin:0 10px 0 0;}
+.controls>div>button:last-child,.controls>div>select:last-child{margin-right:0;}
+.wqx{background-color:#E0E0E0;border:1px solid gray;margin-top:15px;padding:10px;}
+.lcd{background-color:#90B057;}
+.split{border-top:2px solid gray;height:0;margin:5px 0;}
+.keypad{padding-top:3px;width:376px;}
+.keypad>div{height:22px;margin-bottom:5px;}
+.keypad>div:last-child{margin-bottom:0;}
+.keypad_unit{background-color:#D5E9CD;border:1px solid #80D046;border-radius:3px;cursor:pointer;display:inline-block;height:20px;margin-right:4px;width:32px;-moz-user-select:none;-o-user-select:none;-webkit-user-select:none;}
+.keypad_unit:hover{outline:1px dotted green;}
+.keypad_unit:last-child{margin-right:0;}
+.keypad_unit.pressed{background-color:#C0C0C0;border-color:black;}
+.keypad_unit_label{color:blue;font-size:12px;height:20px;line-height:20px;overflow:hidden;position:absolute;text-align:center;width:32px;}
+.msgBar{border:1px solid gray;margin:10px 0 0 0;padding:2px 3px;width:390px;}
+</style>
+</head>
+<body>
+<div class="controls">
+<div><button id="init" title="载入ROM文件并初始化">初始化</button
+	><button id="import" disabled="disabled" title="导入闪存文件">导入闪存</button
+	><button id="export" disabled="disabled" title="导出闪存文件">导出闪存</button
+></div>
+<div><button id="playStop" disabled="disabled">运行</button
+	><button id="reset" disabled="disabled" title="重置模拟器(Reset文曲星)">重置</button
+	><select id="speedMulti" disabled="disabled" title="调节运行速度(快捷键:上一速度:<Home>,下一速度:<End>)">
+		<option value="1" title="原速运行(快捷键:<[>)">原速</option>
+		<option value="0.25" title="1/4倍速运行">1/4倍速</option>
+		<option value="0.5" title="1/2倍速运行">1/2倍速</option>
+		<option value="1.5" title="1.5倍速运行(快捷键:<\>)">1.5倍速</option>
+		<option value="2" title="2倍速运行">2倍速</option>
+		<option value="3" title="3倍速运行">3倍速</option>
+		<option value="4" title="4倍速运行">4倍速</option>
+		<option value="5" title="5倍速运行">5倍速</option>
+		<option value="0" title="全速运行(快捷键:<]>)">全速</option>
+	</select
+></div>
+</div>
+<div class="wqx">
+	<canvas id="lcd" class="lcd" width="376" height="160"></canvas>
+	<div class="split"></div>
+	<div id="keypad" class="keypad"></div>
+</div>
+<div><input id="msgBar" class="msgBar" type="text" readonly="readonly" value="尚未初始化..." /></div>
+<script type="text/javascript">
+setTimeout(function(){
+  window.wqx=new WQX();
+  var btn_playStop=document.getElementById('playStop');
+  var btn_reset=document.getElementById('reset');
+  var btn_init=document.getElementById('init');
+  var btn_import=document.getElementById('import');
+  var btn_export=document.getElementById('export');
+  var sel_speed=document.getElementById('speedMulti');
+  var cvs_lcd=document.getElementById('lcd');
+  var div_keypad=document.getElementById('keypad');
+  var ipt_msgBar=document.getElementById('msgBar');
+  var hasFlsData=false;
+  var cout=function(msg){
+    ipt_msgBar.value=msg;
+  };
+  var progress=function(p1,p2){
+    cout('正在读取数据: '+p1+'/'+p2);
+  };
+  var playStopKeyCd=96;
+  var speedNormalKeyCd=91;
+  var speedFullKeyCd=93;
+  var speedDownKeyCd=36;
+  var speedUpKeyCd=35;
+  var speedFavorKeyCd=92;
+  var speedFavorIdx=3;
+  btn_playStop.title='运行模拟器(快捷键:<'+String.fromCharCode(playStopKeyCd)+'>)';
+  btn_init.onclick=function(){
+    var rom;
+    var checkRom=function(){
+      if(rom){
+        setTimeout(function(){
+          wqx.init(rom,cvs_lcd.getContext('2d'));
+          btn_import.removeAttribute('disabled');
+          cout('初始化完毕. 无闪存数据...');
+        },0);
+      }else{
+        btn_init.removeAttribute('disabled');
+        cout('初始化失败!');
+      }
+    };
+    var ipt_init=document.createElement('input');
+    ipt_init.setAttribute('type','file');
+    ipt_init.addEventListener('change',function(){
+      btn_init.setAttribute('disabled','disabled');
+      var file=ipt_init.files[0];
+      var reader=new FileReader();
+      reader.addEventListener('progress',function(evt){
+        progress(evt.loaded,evt.total);
+      });
+      reader.addEventListener('loadend',function(){
+        rom=reader.result;
+        checkRom();
+      });
+      reader.readAsArrayBuffer(file);
+    });
+    ipt_init.click();
+  };
+  btn_import.onclick=function(){
+    var nor;
+    var checkNor=function(){
+      if(nor){
+        var running=wqx.running();
+        if(running){
+          wqx.stop();
+        }
+        wqx.setNor(nor);
+        hasFlsData=true;
+        wqx.reset();
+        btn_playStop.removeAttribute('disabled');
+        btn_reset.removeAttribute('disabled');
+        btn_export.removeAttribute('disabled');
+        sel_speed.removeAttribute('disabled');
+        btn_import.removeAttribute('disabled');
+        cout('导入闪存成功.');
+        if(running){
+          wqx.play();
+          cout('运行中...');
+        }
+      }else{
+        if(hasFlsData){
+          btn_playStop.removeAttribute('disabled');
+          btn_reset.removeAttribute('disabled');
+          btn_export.removeAttribute('disabled');
+          sel_speed.removeAttribute('disabled');
+        }
+        btn_import.removeAttribute('disabled');
+        cout('导入闪存失败!');
+      }
+    };
+    if(hasFlsData){
+      if(!confirm('注意：导入闪存将会覆盖现有闪存数据并重置模拟器，确定吗？')){
+        return;
+      }
+    }
+    var ipt_import=document.createElement('input');
+    ipt_import.setAttribute('type','file');
+    ipt_import.addEventListener('change',function(){
+      btn_playStop.setAttribute('disabled','disabled');
+      btn_reset.setAttribute('disabled','disabled');
+      btn_export.setAttribute('disabled','disabled');
+      sel_speed.setAttribute('disabled','disabled');
+      btn_import.setAttribute('disabled','disabled');
+      var file=ipt_import.files[0];
+      var reader=new FileReader();
+      reader.addEventListener('progress',function(evt){
+        progress(evt.loaded,evt.total);
+      });
+      reader.addEventListener('loadend',function(){
+        nor=reader.result;
+        checkNor();
+      });
+      reader.readAsArrayBuffer(file);
+    });
+    ipt_import.click();
+  };
+  var lastBlobUrl;
+  btn_export.onclick=function(){
+    var a_export=document.createElement('a');
+    a_export.setAttribute('target','_blank');
+    var blob=new Blob([wqx.getNor()],{
+      type:'application/octet-stream'
+    });
+    if(lastBlobUrl){
+      URL.revokeObjectURL(lastBlobUrl);
+      lastBlobUrl=null;
+    }
+    var blobUrl=URL.createObjectURL(blob);
+    a_export.setAttribute('href',blobUrl);
+    a_export.click();
+    lastBlobUrl=blobUrl;
+  };
+  btn_playStop.onclick=function(){
+    if(!wqx.running()){
+      wqx.play();
+      btn_playStop.textContent='停止';
+      btn_playStop.title='停止模拟器(快捷键:<'+String.fromCharCode(playStopKeyCd)+'>)';
+      cout('运行中...');
+    }else{
+      wqx.stop();
+      btn_playStop.textContent='运行';
+      btn_playStop.title='运行模拟器(快捷键:<'+String.fromCharCode(playStopKeyCd)+'>)';
+      cout('已停止...');
+    }
+  };
+  btn_reset.onclick=function(){
+    wqx.reset();
+  };
+  sel_speed.onchange=function(){
+    wqx.changeSpeed(sel_speed.value);
+  };
+  (function(){
+    // key code map
+    var KEY_CODE_MAP=new Array(0x100);
+    KEY_CODE_MAP[0x74]=0x0B; // 英汉|汉英 <F5>
+    KEY_CODE_MAP[0x75]=0x0C; // 名片|通讯 <F6>
+    KEY_CODE_MAP[0x76]=0x0D; // 计算|换算 <F7>
+    KEY_CODE_MAP[0x77]=0x0A; // 行程|资料 <F8>
+    KEY_CODE_MAP[0x78]=0x09; // 游戏|测验 <F9>
+    KEY_CODE_MAP[0x79]=0x08; // 时间|其他 <F10>
+    KEY_CODE_MAP[0x7A]=0x0E; // 网络 <F11>
+    KEY_CODE_MAP[0x7B]=0x0F; // 电源 <F12>
+    KEY_CODE_MAP[0x70]=0x10; // F1插入 <F1><Insert>
+    KEY_CODE_MAP[0x71]=0x11; // F2删除 <F2><Delete><Backspace>
+    KEY_CODE_MAP[0x72]=0x12; // F3查找 <F3>
+    KEY_CODE_MAP[0x73]=0x13; // F4修改 <F4>
+    KEY_CODE_MAP[0xBA]=0x15; // 发音 <;>
+    KEY_CODE_MAP[0xDE]=0x14; // 报时 <'>
+    KEY_CODE_MAP[0x4F]=0x18; // O|÷|# <O>
+    KEY_CODE_MAP[0x4C]=0x19; // L|×|* <L>
+    KEY_CODE_MAP[0x26]=0x1A; // ⇧|－ <↑>
+    KEY_CODE_MAP[0x28]=0x1B; // ⇩|＋ <↓>
+    KEY_CODE_MAP[0x50]=0x1C; // P|MC|℡ <P>
+    KEY_CODE_MAP[0x0D]=0x1D; // 输入|MR <Enter>
+    KEY_CODE_MAP[0x22]=0x1E; // ︾|M- <Page Down>
+    KEY_CODE_MAP[0x27]=0x1F; // ⇨|M+ <→>
+    KEY_CODE_MAP[0x51]=0x20; // Q|sin|arcsin <Q>
+    KEY_CODE_MAP[0x57]=0x21; // W|cos|arccos <W>
+    KEY_CODE_MAP[0x45]=0x22; // E|tan|arctan <E>
+    KEY_CODE_MAP[0x52]=0x23; // R|x^-1|hyp <R>
+    KEY_CODE_MAP[0x54]=0x24; // T|7 <T><7><Num 7>
+    KEY_CODE_MAP[0x59]=0x25; // Y|8 <Y><8><Num 8>
+    KEY_CODE_MAP[0x55]=0x26; // U|9 <U><9><Num 9>
+    KEY_CODE_MAP[0x49]=0x27; // I|% <I>
+    KEY_CODE_MAP[0x41]=0x28; // A|㏒|10^x <A>
+    KEY_CODE_MAP[0x53]=0x29; // S|㏑|e^x <S>
+    KEY_CODE_MAP[0x44]=0x2A; // D|x^y|x^-y <D>
+    KEY_CODE_MAP[0x46]=0x2B; // F|x^½|x² <F>
+    KEY_CODE_MAP[0x47]=0x2C; // G|4 <G><4><Num 4>
+    KEY_CODE_MAP[0x48]=0x2D; // H|5 <H><5><Num 5>
+    KEY_CODE_MAP[0x4A]=0x2E; // J|6 <J><6><Num 6>
+    KEY_CODE_MAP[0x4B]=0x2F; // K|±|? <K>
+    KEY_CODE_MAP[0x5A]=0x30; // Z|(|) <Z>
+    KEY_CODE_MAP[0x58]=0x31; // X|π|x! <X>
+    KEY_CODE_MAP[0x43]=0x32; // C|EXP|°′″ <C>
+    KEY_CODE_MAP[0x56]=0x33; // V|c <V>
+    KEY_CODE_MAP[0x42]=0x34; // B|1 <B><1><Num 1>
+    KEY_CODE_MAP[0x4E]=0x35; // N|2 <N><2><Num 2>
+    KEY_CODE_MAP[0x4D]=0x36; // M|3 <M><3><Num 3>
+    KEY_CODE_MAP[0x21]=0x37; // ︽|税 <Page Up>
+    KEY_CODE_MAP[0x11]=0x38; // 求助 <Ctrl>
+    KEY_CODE_MAP[0x10]=0x39; // 中英数|SHIFT <Shift>
+    KEY_CODE_MAP[0x12]=0x3A; // 输入法|CAPS <Alt>
+    KEY_CODE_MAP[0x1B]=0x3B; // 跳出|AC <Esc>
+    KEY_CODE_MAP[0x30]=0x3C; // 符号|0|继续 <0><Num 0>
+    KEY_CODE_MAP[0xBE]=0x3D; // .|·|— <.><Num .>
+    KEY_CODE_MAP[0xBB]=0x3E; // 空格|=|√ <Space><=>
+    KEY_CODE_MAP[0x25]=0x3F; // ⇦ <←>
+    // F1
+    KEY_CODE_MAP[0x2D]=KEY_CODE_MAP[0x70];
+    // F2
+    KEY_CODE_MAP[0x2E]=KEY_CODE_MAP[0x71];KEY_CODE_MAP[0x08]=KEY_CODE_MAP[0x71];
+    // 0 ~ 9
+    KEY_CODE_MAP[0x60]=KEY_CODE_MAP[0x30];
+    KEY_CODE_MAP[0x31]=KEY_CODE_MAP[0x42];KEY_CODE_MAP[0x61]=KEY_CODE_MAP[0x42];
+    KEY_CODE_MAP[0x32]=KEY_CODE_MAP[0x4E];KEY_CODE_MAP[0x62]=KEY_CODE_MAP[0x4E];
+    KEY_CODE_MAP[0x33]=KEY_CODE_MAP[0x4D];KEY_CODE_MAP[0x63]=KEY_CODE_MAP[0x4D];
+    KEY_CODE_MAP[0x34]=KEY_CODE_MAP[0x47];KEY_CODE_MAP[0x64]=KEY_CODE_MAP[0x47];
+    KEY_CODE_MAP[0x35]=KEY_CODE_MAP[0x48];KEY_CODE_MAP[0x65]=KEY_CODE_MAP[0x48];
+    KEY_CODE_MAP[0x36]=KEY_CODE_MAP[0x4A];KEY_CODE_MAP[0x66]=KEY_CODE_MAP[0x4A];
+    KEY_CODE_MAP[0x37]=KEY_CODE_MAP[0x54];KEY_CODE_MAP[0x67]=KEY_CODE_MAP[0x54];
+    KEY_CODE_MAP[0x38]=KEY_CODE_MAP[0x59];KEY_CODE_MAP[0x68]=KEY_CODE_MAP[0x59];
+    KEY_CODE_MAP[0x39]=KEY_CODE_MAP[0x55];KEY_CODE_MAP[0x69]=KEY_CODE_MAP[0x55];
+    // .
+    KEY_CODE_MAP[0x6E]=KEY_CODE_MAP[0xBE];
+    // Space
+    KEY_CODE_MAP[0x20]=KEY_CODE_MAP[0xBB];
+    // key name map
+    var KEY_NAME_MAP=new Array(0x40);
+    KEY_NAME_MAP[0x0B]='英汉';
+    KEY_NAME_MAP[0x0C]='名片';
+    KEY_NAME_MAP[0x0D]='计算';
+    KEY_NAME_MAP[0x0A]='行程';
+    KEY_NAME_MAP[0x09]='测验';
+    KEY_NAME_MAP[0x08]='时间';
+    KEY_NAME_MAP[0x0E]='网络';
+    KEY_NAME_MAP[0x0F]='电源';
+    KEY_NAME_MAP[0x10]='F1';
+    KEY_NAME_MAP[0x11]='F2';
+    KEY_NAME_MAP[0x12]='F3';
+    KEY_NAME_MAP[0x13]='F4';
+    KEY_NAME_MAP[0x15]='发音';
+    KEY_NAME_MAP[0x14]='报时';
+    KEY_NAME_MAP[0x18]='O';
+    KEY_NAME_MAP[0x19]='L';
+    KEY_NAME_MAP[0x1A]='↑';
+    KEY_NAME_MAP[0x1B]='↓';
+    KEY_NAME_MAP[0x1C]='P';
+    KEY_NAME_MAP[0x1D]='输入';
+    KEY_NAME_MAP[0x1E]='︾';
+    KEY_NAME_MAP[0x1F]='→';
+    KEY_NAME_MAP[0x20]='Q';
+    KEY_NAME_MAP[0x21]='W';
+    KEY_NAME_MAP[0x22]='E';
+    KEY_NAME_MAP[0x23]='R';
+    KEY_NAME_MAP[0x24]='T/7';
+    KEY_NAME_MAP[0x25]='Y/8';
+    KEY_NAME_MAP[0x26]='U/9';
+    KEY_NAME_MAP[0x27]='I';
+    KEY_NAME_MAP[0x28]='A';
+    KEY_NAME_MAP[0x29]='S';
+    KEY_NAME_MAP[0x2A]='D';
+    KEY_NAME_MAP[0x2B]='F';
+    KEY_NAME_MAP[0x2C]='G/4';
+    KEY_NAME_MAP[0x2D]='H/5';
+    KEY_NAME_MAP[0x2E]='J/6';
+    KEY_NAME_MAP[0x2F]='K';
+    KEY_NAME_MAP[0x30]='Z';
+    KEY_NAME_MAP[0x31]='X';
+    KEY_NAME_MAP[0x32]='C';
+    KEY_NAME_MAP[0x33]='V';
+    KEY_NAME_MAP[0x34]='B/1';
+    KEY_NAME_MAP[0x35]='N/2';
+    KEY_NAME_MAP[0x36]='M/3';
+    KEY_NAME_MAP[0x37]='︽';
+    KEY_NAME_MAP[0x38]='求助';
+    KEY_NAME_MAP[0x39]='中英';
+    KEY_NAME_MAP[0x3A]='CAPS';
+    KEY_NAME_MAP[0x3B]='跳出';
+    KEY_NAME_MAP[0x3C]='0';
+    KEY_NAME_MAP[0x3D]='·';
+    KEY_NAME_MAP[0x3E]='空格';
+    KEY_NAME_MAP[0x3F]='←';
+    // key title map
+    var KEY_TITLE_MAP=new Array(0x40);
+    KEY_TITLE_MAP[0x0B]='英汉|汉英 <F5>';
+    KEY_TITLE_MAP[0x0C]='名片|通讯 <F6>';
+    KEY_TITLE_MAP[0x0D]='计算|换算 <F7>';
+    KEY_TITLE_MAP[0x0A]='行程|资料 <F8>';
+    KEY_TITLE_MAP[0x09]='测验|游戏 <F9>';
+    KEY_TITLE_MAP[0x08]='时间|其他 <F10>';
+    KEY_TITLE_MAP[0x0E]='网络 <F11>';
+    KEY_TITLE_MAP[0x0F]='电源 <F12>';
+    KEY_TITLE_MAP[0x10]='F1插入 <F1><Insert>';
+    KEY_TITLE_MAP[0x11]='F2删除 <F2><Delete><Backspace>';
+    KEY_TITLE_MAP[0x12]='F3查找 <F3>';
+    KEY_TITLE_MAP[0x13]='F4修改 <F4>';
+    KEY_TITLE_MAP[0x15]='发音 <;>';
+    KEY_TITLE_MAP[0x14]='报时 <\'>';
+    KEY_TITLE_MAP[0x18]='O|÷|# <O>';
+    KEY_TITLE_MAP[0x19]='L|×|* <L>';
+    KEY_TITLE_MAP[0x1A]='↑|－ <↑>';
+    KEY_TITLE_MAP[0x1B]='↓|＋ <↓>';
+    KEY_TITLE_MAP[0x1C]='P|MC|℡ <P>';
+    KEY_TITLE_MAP[0x1D]='输入|MR <Enter>';
+    KEY_TITLE_MAP[0x1E]='︾|M- <Page Down>';
+    KEY_TITLE_MAP[0x1F]='→|M+ <→>';
+    KEY_TITLE_MAP[0x20]='Q|sin|arcsin <Q>';
+    KEY_TITLE_MAP[0x21]='W|cos|arccos <W>';
+    KEY_TITLE_MAP[0x22]='E|tan|arctan <E>';
+    KEY_TITLE_MAP[0x23]='R|x^-1|hyp <R>';
+    KEY_TITLE_MAP[0x24]='T|7 <T><7><Num 7>';
+    KEY_TITLE_MAP[0x25]='Y|8 <Y><8><Num 8>';
+    KEY_TITLE_MAP[0x26]='U|9 <U><9><Num 9>';
+    KEY_TITLE_MAP[0x27]='I|% <I>';
+    KEY_TITLE_MAP[0x28]='A|㏒|10^x <A>';
+    KEY_TITLE_MAP[0x29]='S|㏑|e^x <S>';
+    KEY_TITLE_MAP[0x2A]='D|x^y|x^-y <D>';
+    KEY_TITLE_MAP[0x2B]='F|x^½|x² <F>';
+    KEY_TITLE_MAP[0x2C]='G|4 <G><4><Num 4>';
+    KEY_TITLE_MAP[0x2D]='H|5 <H><5><Num 5>';
+    KEY_TITLE_MAP[0x2E]='J|6 <J><6><Num 6>';
+    KEY_TITLE_MAP[0x2F]='K|±|? <K>';
+    KEY_TITLE_MAP[0x30]='Z|(|) <Z>';
+    KEY_TITLE_MAP[0x31]='X|π|x! <X>';
+    KEY_TITLE_MAP[0x32]='C|EXP|°′″ <C>';
+    KEY_TITLE_MAP[0x33]='V|c <V>';
+    KEY_TITLE_MAP[0x34]='B|1 <B><1><Num 1>';
+    KEY_TITLE_MAP[0x35]='N|2 <N><2><Num 2>';
+    KEY_TITLE_MAP[0x36]='M|3 <M><3><Num 3>';
+    KEY_TITLE_MAP[0x37]='︽|税 <Page Up>';
+    KEY_TITLE_MAP[0x38]='求助 <Ctrl>';
+    KEY_TITLE_MAP[0x39]='中英数|SHIFT <Shift>';
+    KEY_TITLE_MAP[0x3A]='输入法|CAPS <Alt>';
+    KEY_TITLE_MAP[0x3B]='跳出|AC <Esc>';
+    KEY_TITLE_MAP[0x3C]='符号|0|继续 <0><Num 0>';
+    KEY_TITLE_MAP[0x3D]='.|·|— <.><Num .>';
+    KEY_TITLE_MAP[0x3E]='空格|=|√ <Space><=>';
+    KEY_TITLE_MAP[0x3F]='← <←>';
+    // 0x02 红外线
+    // keypad
+    var KEYPAD=[
+      [0x10,0x11,0x12,0x13,null,null,null,null,null,0x0F],
+      [0x15,0x14,null,0x0B,0x0C,0x0D,0x0A,0x09,0x08,0x0E],
+      [0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x18,0x1C],
+      [0x28,0x29,0x2A,0x2B,0x2C,0x2D,0x2E,0x2F,0x19,0x1D],
+      [0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x1A,0x1E],
+      [0x38,0x39,0x3A,0x3B,0x3C,0x3D,0x3E,0x3F,0x1B,0x1F]
+    ];
+    var buff=[];
+    for(var r=0;r<KEYPAD.length;r++){
+      var row=KEYPAD[r];
+      buff.push('<div>');
+      for(var c=0;c<row.length;c++){
+        var cell=row[c];
+        if(cell!=null){
+          buff.push('<div class="keypad_unit" data-key="0x');
+          buff.push(('00'+cell.toString(16)).slice(-2));
+          buff.push('" title="');
+          buff.push(KEY_TITLE_MAP[cell]);
+          buff.push('"><div class="keypad_unit_label">');
+          buff.push(KEY_NAME_MAP[cell]);
+          buff.push('</div></div>');
+        }else{
+          buff.push('<div class="keypad_unit" style="visibility:hidden"></div>');
+        }
+      }
+      buff.push('</div>');
+    }
+    div_keypad.innerHTML=buff.join('');
+    // key event
+    var setKey=function(key,downOrUp,wqxRunning){
+      var keyStr='0x'+('00'+key.toString(16)).slice(-2);
+      var keyUnit=document.querySelector('div.keypad_unit[data-key="'+keyStr+'"]');
+      if(keyUnit){
+        if(downOrUp){
+          keyUnit.classList.add('pressed');
+        }else{
+          keyUnit.classList.remove('pressed');
+        }
+      }
+      if(wqxRunning){
+        wqx.setKey(key,downOrUp);
+      }
+    };
+    var downKeys={};
+    var lastMouseKey=null;
+    div_keypad.addEventListener('mousedown',function(evt){
+      var div=evt.target;
+      do{
+        if(div.classList.contains('keypad_unit')){
+          var key=Number(div.getAttribute('data-key'));
+          lastMouseKey=key;
+          setKey(key,true,wqx.running());
+          break;
+        }
+        div=div.parentNode;
+      }while(div && div.nodeType==1);
+    });
+    document.addEventListener('mouseup',function(evt){
+      if(lastMouseKey!=null){
+        if(!downKeys[lastMouseKey]){
+          setKey(lastMouseKey,false,wqx.running());
+        }
+        lastMouseKey=null;
+      }
+    });
+    document.addEventListener('keydown',function(evt){
+      if(KEY_CODE_MAP[evt.keyCode]!=null){
+        var key=KEY_CODE_MAP[evt.keyCode];
+        downKeys[key]=1;
+        setKey(key,true,wqx.running());
+        evt.preventDefault();
+      }
+    });
+    document.addEventListener('keyup',function(evt){
+      if(KEY_CODE_MAP[evt.keyCode]!=null){
+        var key=KEY_CODE_MAP[evt.keyCode];
+        downKeys[key]=0;
+        setKey(key,false,wqx.running());
+        evt.preventDefault();
+      }
+    });
+    document.addEventListener('keypress',function(evt){
+      if(playStopKeyCd===evt.keyCode){
+        if(!btn_playStop.disabled){
+          btn_playStop.click();
+        }
+        evt.preventDefault();
+      }
+      if(!sel_speed.disabled){
+        if(speedNormalKeyCd===evt.keyCode){
+          var opts=sel_speed.options;
+          var selIdx=opts.selectedIndex;
+          if(selIdx!==0){
+            sel_speed.options.selectedIndex=0;
+            wqx.changeSpeed(sel_speed.value);
+          }
+          evt.preventDefault();
+        }
+        if(speedFullKeyCd===evt.keyCode){
+          var opts=sel_speed.options;
+          var len=opts.length;
+          var selIdx=opts.selectedIndex;
+          if(len>0&&selIdx!==len-1){
+            opts.selectedIndex=len-1;
+            wqx.changeSpeed(sel_speed.value);
+          }
+          evt.preventDefault();
+        }
+        if(speedFavorKeyCd===evt.keyCode){
+          var opts=sel_speed.options;
+          var len=opts.length-1;
+          if(len>speedFavorIdx){
+            opts.selectedIndex=speedFavorIdx;
+            wqx.changeSpeed(sel_speed.value);
+          }
+          evt.preventDefault();
+        }
+      }
+    });
+    document.addEventListener('keydown',function(evt){
+      if(!sel_speed.disabled){
+        if(speedUpKeyCd===evt.keyCode){
+          var opts=sel_speed.options;
+          var len=opts.length-1;
+          var selIdx=opts.selectedIndex;
+          if(selIdx<len){
+            opts.selectedIndex=selIdx+1;
+            wqx.changeSpeed(sel_speed.value);
+          }
+          evt.preventDefault();
+        }
+        if(speedDownKeyCd===evt.keyCode){
+          var opts=sel_speed.options;
+          var selIdx=opts.selectedIndex;
+          if(selIdx>0){
+            opts.selectedIndex=selIdx-1;
+            wqx.changeSpeed(sel_speed.value);
+          }
+          evt.preventDefault();
+        }
+      }
+    });
+  })();
+  window.onbeforeunload=function(){
+    return "警告：你即将离开此页面！\n\n离开页面后所有数据都将丢失(包括闪存数据)！\n建议点击“导出闪存”按钮将闪存数据保存至本地文件。";
+  };
+},0);
+</script>
+<!-- ==start== Debug Area -->
+<textarea id="dbg" rows="6" cols="50" readonly="readonly" style="border:1px solid gray;display:none;margin-top:10px;padding:3px;resize:none;width:390px;" ondblclick="this.style.display='none';"></textarea>
+<script type="text/javascript">
+function wqxDebugKey(key){
+	wqx.setKey(key,true);
+	setTimeout(function(){
+		wqx.setKey(key,false);
+	},20);
+}
+function debugMsg(msg,clear){
+	var dbgCon = document.getElementById("dbg");
+	if(clear){
+		dbgCon.innerHTML="";
+	}
+	dbgCon.appendChild(document.createTextNode(msg));
+	dbgCon.style.display="block";
+}
+</script>
+<!-- ===end=== Debug Area -->
+</body>
+</html>
