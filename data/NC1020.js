@@ -1687,21 +1687,17 @@ WQX=(function(){
     var write3F=function(o,addr,val){
       o.pio[addr]=val;
       var idx=o.pio[0x3E];
-      if(idx>=0x07){
-        if(idx===0x0B){
-          o.pio[0x3D]=0xF8;
-          o.clockFlag|=val&0x07;
-          o.clockBuff[0x0B]=val^((o.clockBuff[0x0B]^val)&0x7F);
-        }else if(idx===0x0A){
-          o.clockFlag|=val&0x07;
-          o.clockBuff[0x0A]=val;
-        }else{
-          o.clockBuff[idx%80]=val;
-        }
-      }else{
-        if(!(o.clockBuff[0x0B]&0x80)&&idx<80){
-          o.clockBuff[idx]=val;
-        }
+      if(idx===0x0B){
+        o.pio[0x3D]=0xF8;
+        o.clockFlag|=val&0x07;
+        o.clockBuff[0x0B]=val^((o.clockBuff[0x0B]^val)&0x7F);
+      }else if(idx===0x0A){
+        o.clockFlag|=val&0x07;
+        o.clockBuff[0x0A]=val;
+      }else if(idx>=0x07){
+        o.clockBuff[idx%80]=val;
+      }else if(!(o.clockBuff[0x0B]&0x80)){
+        o.clockBuff[idx]=val;
       }
     };
     // region wqx.prototype.ioRead
