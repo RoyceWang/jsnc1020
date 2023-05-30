@@ -1540,6 +1540,11 @@ WQX=(function(){
       if(val!==oldVal){
         if(val<0x20){
           o.switchBank(o.norBanks[val]);
+          if(val===0){
+            o.memMap[2]=o.page2;
+            //o.memMap[3]=o.page6;
+            o.memMap[3]=o.page2; // On NC1020 real machine, when $00=0, the $4000-$5FFF is same as $6000-$7FFF
+          }
         }else if(val>=0x80){
           var volIdx=o.pio[0x0D];
           if(volIdx&0x01){
