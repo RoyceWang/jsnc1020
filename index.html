@@ -6,10 +6,14 @@
 <script type="text/javascript" src="./data/NC1020.js"></script>
 <style type="text/css">
 body{font-family:'新宋体';margin-left:auto;margin-right:auto;padding:20px;width:398px;}
-.controls>div{margin:0 0 5px 0;}
-.controls>div:last-child{margin-bottom:0;}
-.controls>div>button,.controls>div>select{margin:0 10px 0 0;}
-.controls>div>button:last-child,.controls>div>select:last-child{margin-right:0;}
+.toolbar{margin:0 0 5px 0;display:flex;justify-content:space-between;}
+.toolbar:last-child{margin-bottom:0;}
+.toolbar>.tool-group{display:flex;}
+.toolbar>.tool-group.tool-right{justify-content:flex-end;}
+.toolbar .tool{margin:0 10px 0 0;}
+.toolbar .tool:last-child{margin-right:0;}
+.download-panel{margin-top:8px;text-align:right;}
+.download-panel{list-style-type:none;}
 .wqx{background-color:#E0E0E0;border:1px solid gray;margin-top:15px;padding:10px;}
 .lcd{background-color:#90B057;}
 .split{border-top:2px solid gray;height:0;margin:5px 0;}
@@ -25,26 +29,38 @@ body{font-family:'新宋体';margin-left:auto;margin-right:auto;padding:20px;wid
 </style>
 </head>
 <body>
-<div class="controls">
-<div><button id="init" title="载入ROM文件并初始化">初始化</button
-	><button id="import" disabled="disabled" title="导入闪存文件">导入闪存</button
-	><button id="export" disabled="disabled" title="导出闪存文件">导出闪存</button
-></div>
-<div><button id="playStop" disabled="disabled">运行</button
-	><button id="reset" disabled="disabled" title="重置模拟器(Reset文曲星)">重置</button
-	><select id="speedMulti" disabled="disabled" title="调节运行速度(快捷键:上一速度:<Home>,下一速度:<End>)">
-		<option value="1" title="原速运行(快捷键:<[>)">原速</option>
-		<option value="0.25" title="1/4倍速运行">1/4倍速</option>
-		<option value="0.5" title="1/2倍速运行">1/2倍速</option>
-		<option value="1.5" title="1.5倍速运行(快捷键:<\>)">1.5倍速</option>
-		<option value="2" title="2倍速运行">2倍速</option>
-		<option value="3" title="3倍速运行">3倍速</option>
-		<option value="4" title="4倍速运行">4倍速</option>
-		<option value="5" title="5倍速运行">5倍速</option>
-		<option value="0" title="全速运行(快捷键:<]>)">全速</option>
-	</select
-></div>
+<div class="toolbar">
+  <div class="tool-group">
+    <button id="init" class="tool" title="载入ROM文件并初始化">初始化</button>
+    <button id="import" class="tool" disabled="disabled" title="导入闪存文件">导入闪存</button>
+    <button id="export" class="tool" disabled="disabled" title="导出闪存文件">导出闪存</button>
+  </div>
 </div>
+<div class="toolbar">
+  <div class="tool-group">
+    <button id="playStop" class="tool" disabled="disabled">运行</button>
+    <button id="reset" class="tool" disabled="disabled" title="重置模拟器(Reset文曲星)">重置</button>
+    <select id="speedMulti" class="tool" disabled="disabled" title="调节运行速度(快捷键:上一速度:<Home>,下一速度:<End>)">
+      <option value="1" title="原速运行(快捷键:<[>)">原速</option>
+      <option value="0.25" title="1/4倍速运行">1/4倍速</option>
+      <option value="0.5" title="1/2倍速运行">1/2倍速</option>
+      <option value="1.5" title="1.5倍速运行(快捷键:<\>)">1.5倍速</option>
+      <option value="2" title="2倍速运行">2倍速</option>
+      <option value="3" title="3倍速运行">3倍速</option>
+      <option value="4" title="4倍速运行">4倍速</option>
+      <option value="5" title="5倍速运行">5倍速</option>
+      <option value="0" title="全速运行(快捷键:<]>)">全速</option>
+    </select>
+  </div>
+  <div class="tool-group tool-right">
+    <button id="download" class="tool">下载</button>
+  </div>
+</div>
+<ul id="downloadPanel" class="download-panel" style="display:none;">
+  <li><a href="./data/NC1020_ROM_obj_lu.bin" target="_blank">NC1020 ROM文件</a></li>
+  <li><a href="./data/NC1020_FLASH.fls" target="_blank">NC1020 Flash文件</a></li>
+  <li><a href="./data/NC1020-Flash_Arc_20230524(NCTOOLS+Rv1.0_GoldGMUD-Edit_BINsAndBASICs-Edit).fls" target="_blank" title="应用程序：&#10;NC-TOOLS增强版&#10;黄金英雄坛说&#10;推土机&#10;是男人就下一百层&#10;超级玛俐&#10;&#10;GVBASIC：&#10;天虫总动员v1.11&#10;欢乐潜水艇1.7&#10;开心贪吃蛇&#10;精灵岛传奇V&#10;海空大战">NC1020 Flash文件(添加Bin程序和GVBASIC程序)</a></li>
+</ul>
 <div class="wqx">
 	<canvas id="lcd" class="lcd" width="376" height="160"></canvas>
 	<div class="split"></div>
@@ -59,6 +75,8 @@ setTimeout(function(){
   var btn_init=document.getElementById('init');
   var btn_import=document.getElementById('import');
   var btn_export=document.getElementById('export');
+  var btn_download=document.getElementById('download');
+  var ul_downloadPanel=document.getElementById('downloadPanel');
   var sel_speed=document.getElementById('speedMulti');
   var cvs_lcd=document.getElementById('lcd');
   var div_keypad=document.getElementById('keypad');
@@ -201,6 +219,9 @@ setTimeout(function(){
   };
   sel_speed.onchange=function(){
     wqx.changeSpeed(sel_speed.value);
+  };
+  btn_download.onclick=function(){
+    ul_downloadPanel.style.display=ul_downloadPanel.style.display==='none'?'block':'none';
   };
   (function(){
     // key code map
